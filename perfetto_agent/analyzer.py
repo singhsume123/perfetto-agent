@@ -352,6 +352,53 @@ class PerfettoAnalyzer:
             for item in top
         ]
         return count, top_list, assumption
+
+    def get_app_sections(self, focus_pid: int | None, assumptions: dict) -> dict:
+        """
+        Extract app-defined sections from slices using simple heuristics.
+        """
+        where_clauses = ["(s.name LIKE '%#%' OR s.name IN ('StartupInit'))"]
+        if focus_pid is not None:
+            where_clauses.append(f"p.pid = {focus_pid}")
+        where_sql = " AND ".join(where_clauses)
+
+        rows = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                s.name AS name,
+                COUNT(*) AS count,
+                SUM(s.dur) / 1e6 AS total_ms
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            WHERE {where_sql}
+            GROUP BY s.name
+            ORDER BY total_ms DESC
+            """,
+            "app_sections",
+            assumptions
+        )
+
+        counts: dict[str, int] = {}
+        top_by_total_ms = []
+        for row in rows:
+            name = _normalize_slice_name(row.get("name"))
+            counts[name] = row.get("count") or 0
+            top_by_total_ms.append(
+                {
+                    "name": name,
+                    "total_ms": row.get("total_ms"),
+                    "count": row.get("count")
+                }
+            )
+
+        return {
+            "counts": counts,
+            "top_by_total_ms": top_by_total_ms
+        }
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -548,6 +595,7 @@ def analyze_trace(
             focus_pid,
             assumptions
         )
+        app_sections = analyzer.get_app_sections(focus_pid, assumptions)
 
         # Extract frame summary
         frame_total, frame_janky, frame_assumption = analyzer.get_frame_summary(assumptions)
@@ -575,7 +623,8 @@ def analyze_trace(
                 "janky": frame_janky
             },
             "features": {
-                "long_slices_attributed": long_slices_attributed
+                "long_slices_attributed": long_slices_attributed,
+                "app_sections": app_sections
             },
             "summary": {},
             "assumptions": assumptions
