@@ -132,6 +132,65 @@ class PerfettoAnalyzer:
             return ranked[0].get("pid")
 
         return candidates[0].get("pid")
+
+    def resolve_main_thread(self, focus_pid: int | None, assumptions: dict) -> dict | None:
+        """
+        Resolve the main thread for a focus PID using best-effort heuristics.
+        """
+        if focus_pid is None:
+            return None
+
+        main_by_name = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                t.tid AS tid,
+                t.name AS name,
+                p.pid AS pid,
+                p.name AS process_name
+            FROM thread t
+            JOIN process p ON t.upid = p.upid
+            WHERE p.pid = {focus_pid} AND t.name = 'main'
+            LIMIT 1
+            """,
+            "main_thread",
+            assumptions
+        )
+
+        if main_by_name:
+            return {
+                "tid": main_by_name[0].get("tid"),
+                "name": main_by_name[0].get("name"),
+                "pid": main_by_name[0].get("pid"),
+                "process_name": main_by_name[0].get("process_name")
+            }
+
+        main_by_tid = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                t.tid AS tid,
+                t.name AS name,
+                p.pid AS pid,
+                p.name AS process_name
+            FROM thread t
+            JOIN process p ON t.upid = p.upid
+            WHERE p.pid = {focus_pid} AND t.tid = p.pid
+            LIMIT 1
+            """,
+            "main_thread",
+            assumptions
+        )
+
+        if main_by_tid:
+            return {
+                "tid": main_by_tid[0].get("tid"),
+                "name": main_by_tid[0].get("name"),
+                "pid": main_by_tid[0].get("pid"),
+                "process_name": main_by_tid[0].get("process_name")
+            }
+
+        return None
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -309,6 +368,7 @@ def analyze_trace(
         processes = analyzer.get_processes(assumptions)
 
         focus_pid = analyzer.resolve_focus_pid(focus_process, assumptions)
+        main_thread = analyzer.resolve_main_thread(focus_pid, assumptions)
 
         # Extract startup time
         startup_ms, startup_assumption = analyzer.get_startup_ms(assumptions)
@@ -332,6 +392,10 @@ def analyze_trace(
             "trace_duration_ms": trace_duration_ms,
             "processes": processes,
             "startup_ms": startup_ms,
+            "threads": {
+                "main_thread": main_thread,
+                "top_threads_by_slice_ms": []
+            },
             "ui_thread_long_tasks": {
                 "threshold_ms": long_task_ms,
                 "count": long_task_count,
@@ -341,6 +405,8 @@ def analyze_trace(
                 "total": frame_total,
                 "janky": frame_janky
             },
+            "features": {},
+            "summary": {},
             "assumptions": assumptions
         }
         _set_assumption(
@@ -361,6 +427,18 @@ def analyze_trace(
                 result["assumptions"],
                 "focus_process",
                 f"No matching process found for focus_process={focus_process}"
+            )
+        if focus_pid is None:
+            _set_assumption(
+                result["assumptions"],
+                "main_thread",
+                "Main thread not resolved because focus_pid is null"
+            )
+        elif main_thread is None:
+            _set_assumption(
+                result["assumptions"],
+                "main_thread",
+                f"Main thread not found for pid={focus_pid}"
             )
         return result
     finally:
