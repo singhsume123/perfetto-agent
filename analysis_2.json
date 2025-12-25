@@ -1,0 +1,457 @@
+{
+  "schema_version": "A2",
+  "focus_process": "com.example.tracetoy",
+  "focus_pid": 5664,
+  "trace_path": "tracetoy_trace.perfetto-trace",
+  "trace_duration_ms": 36531.395475,
+  "processes": [
+    {
+      "pid": 1,
+      "name": "/system/bin/init"
+    },
+    {
+      "pid": 2,
+      "name": "kthreadd"
+    },
+    {
+      "pid": 3,
+      "name": "rcu_gp"
+    },
+    {
+      "pid": 4,
+      "name": "slub_flushwq"
+    },
+    {
+      "pid": 5,
+      "name": "netns"
+    },
+    {
+      "pid": 6,
+      "name": "kworker/0:0"
+    },
+    {
+      "pid": 8,
+      "name": "kworker/u2:0"
+    },
+    {
+      "pid": 9,
+      "name": "mm_percpu_wq"
+    },
+    {
+      "pid": 11,
+      "name": "rcu_tasks_kthread"
+    },
+    {
+      "pid": 12,
+      "name": "rcu_tasks_trace_kthread"
+    },
+    {
+      "pid": 13,
+      "name": "ksoftirqd/0"
+    },
+    {
+      "pid": 14,
+      "name": "rcu_preempt"
+    },
+    {
+      "pid": 15,
+      "name": "rcub/0"
+    },
+    {
+      "pid": 16,
+      "name": "rcu_exp_gp_kthread_worker"
+    },
+    {
+      "pid": 17,
+      "name": "rcu_exp_par_gp_kthread_worker"
+    },
+    {
+      "pid": 18,
+      "name": "migration/0"
+    },
+    {
+      "pid": 20,
+      "name": "cpuhp/0"
+    },
+    {
+      "pid": 21,
+      "name": "inet_frag_wq"
+    },
+    {
+      "pid": 22,
+      "name": "kauditd"
+    },
+    {
+      "pid": 23,
+      "name": "khungtaskd"
+    }
+  ],
+  "startup_ms": 2910.1542520000366,
+  "threads": {
+    "main_thread": {
+      "tid": 5664,
+      "name": "xample.tracetoy",
+      "pid": 5664,
+      "process_name": "com.example.tracetoy"
+    },
+    "top_threads_by_slice_ms": [
+      {
+        "tid": 5664,
+        "thread_name": "xample.tracetoy",
+        "pid": 5664,
+        "total_slice_ms": 26359.007045
+      },
+      {
+        "tid": 5688,
+        "thread_name": "RenderThread",
+        "pid": 5664,
+        "total_slice_ms": 18211.915021
+      },
+      {
+        "tid": 5676,
+        "thread_name": "Jit thread pool",
+        "pid": 5664,
+        "total_slice_ms": 1676.62918
+      },
+      {
+        "tid": 5677,
+        "thread_name": "HeapTaskDaemon",
+        "pid": 5664,
+        "total_slice_ms": 1620.082135
+      },
+      {
+        "tid": 7075,
+        "thread_name": "GPU completion",
+        "pid": 5664,
+        "total_slice_ms": 800.181955
+      },
+      {
+        "tid": 5681,
+        "thread_name": "binder:5664_1",
+        "pid": 5664,
+        "total_slice_ms": 242.397748
+      },
+      {
+        "tid": 5697,
+        "thread_name": "binder:5664_3",
+        "pid": 5664,
+        "total_slice_ms": 112.729588
+      },
+      {
+        "tid": 5686,
+        "thread_name": "Profile Saver",
+        "pid": 5664,
+        "total_slice_ms": 105.40975
+      },
+      {
+        "tid": 7113,
+        "thread_name": "binder:5664_5",
+        "pid": 5664,
+        "total_slice_ms": 89.444086
+      },
+      {
+        "tid": 5682,
+        "thread_name": "binder:5664_2",
+        "pid": 5664,
+        "total_slice_ms": 31.029957
+      }
+    ]
+  },
+  "ui_thread_long_tasks": {
+    "threshold_ms": 50,
+    "count": 199,
+    "top": [
+      {
+        "name": "BG#churn",
+        "dur_ms": 267.285083,
+        "ts_ms": 434890.967705
+      },
+      {
+        "name": "BG#churn",
+        "dur_ms": 263.000083,
+        "ts_ms": 438928.217165
+      },
+      {
+        "name": "deliverInputEvent src=0x5002 eventTimeNano=428211057000 id=0x33068d78",
+        "dur_ms": 229.528042,
+        "ts_ms": 428257.644951
+      },
+      {
+        "name": "deliverInputEvent src=0x5002 eventTimeNano=452576231000 id=0x13c39ca1",
+        "dur_ms": 219.369375,
+        "ts_ms": 452577.68038
+      },
+      {
+        "name": "ViewPostImeInputStage id=0x13c39ca1",
+        "dur_ms": 218.946875,
+        "ts_ms": 452577.73763
+      }
+    ]
+  },
+  "features": {
+    "long_slices_attributed": {
+      "threshold_ms": 50,
+      "count": 225,
+      "top": [
+        {
+          "name": "BG#churn",
+          "dur_ms": 267.285083,
+          "pid": 5664,
+          "tid": 5664,
+          "thread_name": "xample.tracetoy",
+          "process_name": "com.example.tracetoy"
+        },
+        {
+          "name": "BG#churn",
+          "dur_ms": 263.000083,
+          "pid": 5664,
+          "tid": 5664,
+          "thread_name": "xample.tracetoy",
+          "process_name": "com.example.tracetoy"
+        },
+        {
+          "name": "Background concurrent copying GC",
+          "dur_ms": 234.169917,
+          "pid": 5664,
+          "tid": 5677,
+          "thread_name": "HeapTaskDaemon",
+          "process_name": "com.example.tracetoy"
+        },
+        {
+          "name": "deliverInputEvent src=0x5002 eventTimeNano=428211057000 id=0x33068d78",
+          "dur_ms": 229.528042,
+          "pid": 5664,
+          "tid": 5664,
+          "thread_name": "xample.tracetoy",
+          "process_name": "com.example.tracetoy"
+        },
+        {
+          "name": "MarkingPhase",
+          "dur_ms": 226.894751,
+          "pid": 5664,
+          "tid": 5677,
+          "thread_name": "HeapTaskDaemon",
+          "process_name": "com.example.tracetoy"
+        }
+      ]
+    },
+    "app_sections": {
+      "counts": {
+        "BG#churn": 194,
+        "dequeueBuffer - VRI[MainActivity]#0(BLAST Consumer)0": 551,
+        "UI#stall_button_click": 4,
+        "Record View#draw()": 365,
+        "onFrameAvailable - VRI[MainActivity]#0(f:0,a:1)": 400,
+        "Choreographer#doFrame 13401": 1,
+        "Choreographer#doFrame - resynced to 13403 in 28.8ms": 1,
+        "Choreographer#scheduleVsyncLocked": 563,
+        "releaseBufferCallback - VRI[MainActivity]#0(f:0,a:2)": 400,
+        "onFrameAvailable - VRI[MainActivity]#0(f:0,a:2)": 151,
+        "releaseBuffer - VRI[MainActivity]#0(f:0,a:1)frame=67": 1,
+        "setFrameTimelineInfo(VRI[MainActivity]#0) frameNumber: 69 vsyncId: 13416": 1,
+        "Choreographer#doFrame 14842": 1,
+        "Choreographer#doFrame 14857": 1,
+        "Choreographer#doFrame - resynced to 14860 in 31.1ms": 1,
+        "Choreographer#doFrame 14239": 1,
+        "Choreographer#doFrame 14367": 1,
+        "Choreographer#doFrame - resynced to 14373 in 30.6ms": 1,
+        "Choreographer#doFrame 14232": 1,
+        "Choreographer#doFrame 14791": 1
+      },
+      "top_by_total_ms": [
+        {
+          "name": "BG#churn",
+          "total_ms": 11811.054475,
+          "count": 194
+        },
+        {
+          "name": "dequeueBuffer - VRI[MainActivity]#0(BLAST Consumer)0",
+          "total_ms": 1697.006082,
+          "count": 551
+        },
+        {
+          "name": "UI#stall_button_click",
+          "total_ms": 818.053168,
+          "count": 4
+        },
+        {
+          "name": "Record View#draw()",
+          "total_ms": 252.53003,
+          "count": 365
+        },
+        {
+          "name": "onFrameAvailable - VRI[MainActivity]#0(f:0,a:1)",
+          "total_ms": 170.084758,
+          "count": 400
+        },
+        {
+          "name": "Choreographer#doFrame 13401",
+          "total_ms": 155.8115,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame - resynced to 13403 in 28.8ms",
+          "total_ms": 149.954083,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#scheduleVsyncLocked",
+          "total_ms": 133.896612,
+          "count": 563
+        },
+        {
+          "name": "releaseBufferCallback - VRI[MainActivity]#0(f:0,a:2)",
+          "total_ms": 113.164957,
+          "count": 400
+        },
+        {
+          "name": "onFrameAvailable - VRI[MainActivity]#0(f:0,a:2)",
+          "total_ms": 110.713043,
+          "count": 151
+        },
+        {
+          "name": "releaseBuffer - VRI[MainActivity]#0(f:0,a:1)frame=67",
+          "total_ms": 55.598625,
+          "count": 1
+        },
+        {
+          "name": "setFrameTimelineInfo(VRI[MainActivity]#0) frameNumber: 69 vsyncId: 13416",
+          "total_ms": 49.396084,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14842",
+          "total_ms": 44.953334,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14857",
+          "total_ms": 39.187166,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame - resynced to 14860 in 31.1ms",
+          "total_ms": 38.955834,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14239",
+          "total_ms": 38.914417,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14367",
+          "total_ms": 38.257042,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame - resynced to 14373 in 30.6ms",
+          "total_ms": 37.706791,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14232",
+          "total_ms": 35.109,
+          "count": 1
+        },
+        {
+          "name": "Choreographer#doFrame 14791",
+          "total_ms": 31.778333,
+          "count": 1
+        }
+      ]
+    },
+    "frame_features": {
+      "total_frames": 888,
+      "janky_frames": 37,
+      "p95_frame_ms": 14.3525
+    },
+    "cpu_features": {
+      "top_processes_by_slice_ms": [
+        {
+          "pid": 5664,
+          "process_name": "com.example.tracetoy",
+          "total_slice_ms": 49267.47679
+        }
+      ],
+      "top_threads_by_slice_ms": [
+        {
+          "tid": 5664,
+          "thread_name": "xample.tracetoy",
+          "pid": 5664,
+          "total_slice_ms": 26359.007045
+        },
+        {
+          "tid": 5688,
+          "thread_name": "RenderThread",
+          "pid": 5664,
+          "total_slice_ms": 18211.915021
+        },
+        {
+          "tid": 5676,
+          "thread_name": "Jit thread pool",
+          "pid": 5664,
+          "total_slice_ms": 1676.62918
+        },
+        {
+          "tid": 5677,
+          "thread_name": "HeapTaskDaemon",
+          "pid": 5664,
+          "total_slice_ms": 1620.082135
+        },
+        {
+          "tid": 7075,
+          "thread_name": "GPU completion",
+          "pid": 5664,
+          "total_slice_ms": 800.181955
+        },
+        {
+          "tid": 5681,
+          "thread_name": "binder:5664_1",
+          "pid": 5664,
+          "total_slice_ms": 242.397748
+        },
+        {
+          "tid": 5697,
+          "thread_name": "binder:5664_3",
+          "pid": 5664,
+          "total_slice_ms": 112.729588
+        },
+        {
+          "tid": 5686,
+          "thread_name": "Profile Saver",
+          "pid": 5664,
+          "total_slice_ms": 105.40975
+        },
+        {
+          "tid": 7113,
+          "thread_name": "binder:5664_5",
+          "pid": 5664,
+          "total_slice_ms": 89.444086
+        },
+        {
+          "tid": 5682,
+          "thread_name": "binder:5664_2",
+          "pid": 5664,
+          "total_slice_ms": 31.029957
+        }
+      ]
+    }
+  },
+  "summary": {
+    "main_thread_found": true,
+    "top_app_sections": [
+      "BG#churn",
+      "dequeueBuffer - VRI[MainActivity]#0(BLAST Consumer)0",
+      "UI#stall_button_click"
+    ],
+    "top_long_slice_name": "BG#churn"
+  },
+  "assumptions": {
+    "trace_duration": "Calculated from trace_bounds table (end_ts - start_ts)",
+    "processes": "Extracted from process table, limited to 20 entries",
+    "startup": "Startup estimated as earliest slice (425136.28ms) to first Choreographer/doFrame (428046.43ms)",
+    "long_tasks": "Long tasks filtered to main thread tid=5664",
+    "frames": "Frame features computed from doFrame slices (p95/jank best-effort)"
+  }
+}
