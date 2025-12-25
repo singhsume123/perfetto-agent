@@ -449,6 +449,84 @@ class PerfettoAnalyzer:
             "janky_frames": janky_frames,
             "p95_frame_ms": p95_frame_ms
         }
+
+    def get_cpu_features(self, focus_pid: int | None, assumptions: dict) -> dict:
+        """
+        Compute CPU-ish aggregates using slice duration totals.
+        """
+        process_filter = ""
+        if focus_pid is not None:
+            process_filter = f"WHERE p.pid = {focus_pid}"
+
+        process_rows = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                p.pid AS pid,
+                p.name AS process_name,
+                SUM(s.dur) / 1e6 AS total_slice_ms
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            {process_filter}
+            GROUP BY p.pid, p.name
+            ORDER BY total_slice_ms DESC
+            LIMIT 10
+            """,
+            "cpu_features",
+            assumptions
+        )
+
+        thread_filter = ""
+        if focus_pid is not None:
+            thread_filter = f"WHERE p.pid = {focus_pid}"
+
+        thread_rows = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                t.tid AS tid,
+                t.name AS thread_name,
+                p.pid AS pid,
+                SUM(s.dur) / 1e6 AS total_slice_ms
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            {thread_filter}
+            GROUP BY t.tid, t.name, p.pid
+            ORDER BY total_slice_ms DESC
+            LIMIT 10
+            """,
+            "cpu_features",
+            assumptions
+        )
+
+        top_processes = [
+            {
+                "pid": row.get("pid"),
+                "process_name": row.get("process_name"),
+                "total_slice_ms": row.get("total_slice_ms")
+            }
+            for row in process_rows
+        ]
+        top_threads = [
+            {
+                "tid": row.get("tid"),
+                "thread_name": row.get("thread_name"),
+                "pid": row.get("pid"),
+                "total_slice_ms": row.get("total_slice_ms")
+            }
+            for row in thread_rows
+        ]
+
+        return {
+            "top_processes_by_slice_ms": top_processes,
+            "top_threads_by_slice_ms": top_threads
+        }
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -650,6 +728,7 @@ def analyze_trace(
         # Extract frame summary
         frame_total, frame_janky, frame_assumption = analyzer.get_frame_summary(assumptions)
         frame_features = analyzer.get_frame_features(assumptions)
+        cpu_features = analyzer.get_cpu_features(focus_pid, assumptions)
 
         # Initialize result with required schema
         result = {
@@ -662,7 +741,7 @@ def analyze_trace(
             "startup_ms": startup_ms,
             "threads": {
                 "main_thread": main_thread,
-                "top_threads_by_slice_ms": []
+                "top_threads_by_slice_ms": cpu_features.get("top_threads_by_slice_ms", [])
             },
             "ui_thread_long_tasks": {
                 "threshold_ms": long_task_ms,
@@ -676,7 +755,8 @@ def analyze_trace(
             "features": {
                 "long_slices_attributed": long_slices_attributed,
                 "app_sections": app_sections,
-                "frame_features": frame_features
+                "frame_features": frame_features,
+                "cpu_features": cpu_features
             },
             "summary": {},
             "assumptions": assumptions
