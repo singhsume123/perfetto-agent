@@ -193,7 +193,13 @@ class PerfettoAnalyzer:
             return None, None, f"Frame summary failed: {str(e)}"
 
 
-def analyze_trace(trace_path: str, long_task_ms: int, top_n: int) -> dict:
+def analyze_trace(
+    trace_path: str,
+    long_task_ms: int,
+    top_n: int,
+    focus_process: str | None,
+    schema_version: str
+) -> dict:
     """
     Analyze a Perfetto trace and return structured results.
 
@@ -223,6 +229,9 @@ def analyze_trace(trace_path: str, long_task_ms: int, top_n: int) -> dict:
 
         # Initialize result with required schema
         result = {
+            "schema_version": schema_version,
+            "focus_process": focus_process,
+            "focus_pid": None,
             "trace_path": trace_path,
             "trace_duration_ms": trace_duration_ms,
             "processes": processes,

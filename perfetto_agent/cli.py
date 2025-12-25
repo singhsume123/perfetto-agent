@@ -1,6 +1,7 @@
 """CLI entry point for Perfetto Baseline Analyzer."""
 
 import typer
+from typing import Optional
 from pathlib import Path
 from rich.console import Console
 from perfetto_agent.analyzer import analyze_trace
@@ -26,6 +27,8 @@ def analyze(
     out: Path = typer.Option("analysis.json", "--out", help="Output JSON file path"),
     long_task_ms: int = typer.Option(50, "--long-task-ms", help="Threshold for long tasks in milliseconds"),
     top_n: int = typer.Option(5, "--top-n", help="Number of top long tasks to report"),
+    focus_process: Optional[str] = typer.Option(None, "--focus-process", help="Filter analysis to a specific process name"),
+    schema_version: str = typer.Option("A2", "--schema-version", help="Schema version to emit in JSON"),
 ):
     """Analyze a Perfetto trace and generate analysis.json."""
 
@@ -42,13 +45,17 @@ def analyze(
     console.print(f"[blue]Output file:[/blue] {out}")
     console.print(f"[blue]Long task threshold:[/blue] {long_task_ms}ms")
     console.print(f"[blue]Top N tasks:[/blue] {top_n}")
+    console.print(f"[blue]Focus process:[/blue] {focus_process}")
+    console.print(f"[blue]Schema version:[/blue] {schema_version}")
 
     # Run analysis
     try:
         result = analyze_trace(
             trace_path=str(trace),
             long_task_ms=long_task_ms,
-            top_n=top_n
+            top_n=top_n,
+            focus_process=focus_process,
+            schema_version=schema_version
         )
 
         # Write output
