@@ -28,6 +28,15 @@ def _set_assumption(assumptions: dict, key: str, note: str) -> None:
         assumptions[key] = note
 
 
+def _normalize_slice_name(name: str | None) -> str:
+    if not name:
+        return "<internal slice>"
+    stripped = name.strip()
+    if stripped.isdigit():
+        return "<internal slice>"
+    return name
+
+
 class PerfettoAnalyzer:
     """Wrapper for Perfetto TraceProcessor with helper utilities."""
 
@@ -191,6 +200,158 @@ class PerfettoAnalyzer:
             }
 
         return None
+
+    def _query_long_slices_attributed(
+        self,
+        threshold_ms: int,
+        top_n: int,
+        pid_filter: int | None,
+        tid_filter: int | None,
+        assumptions: dict,
+        assumption_key: str
+    ) -> tuple[int, list[dict]]:
+        where_clauses = [f"s.dur / 1e6 >= {threshold_ms}"]
+        if pid_filter is not None:
+            where_clauses.append(f"p.pid = {pid_filter}")
+        if tid_filter is not None:
+            where_clauses.append(f"t.tid = {tid_filter}")
+        where_sql = " AND ".join(where_clauses)
+
+        count_rows = _safe_q(
+            self.tp,
+            f"""
+            SELECT COUNT(*) AS count
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            WHERE {where_sql}
+            """,
+            assumption_key,
+            assumptions
+        )
+        count = count_rows[0]["count"] if count_rows else 0
+
+        top_rows = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                s.name AS name,
+                s.dur / 1e6 AS dur_ms,
+                s.ts / 1e6 AS ts_ms,
+                p.pid AS pid,
+                t.tid AS tid,
+                t.name AS thread_name,
+                p.name AS process_name
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            WHERE {where_sql}
+            ORDER BY s.dur DESC
+            LIMIT {top_n}
+            """,
+            assumption_key,
+            assumptions
+        )
+
+        top = []
+        for row in top_rows:
+            top.append(
+                {
+                    "name": _normalize_slice_name(row.get("name")),
+                    "dur_ms": row.get("dur_ms"),
+                    "ts_ms": row.get("ts_ms"),
+                    "pid": row.get("pid"),
+                    "tid": row.get("tid"),
+                    "thread_name": row.get("thread_name"),
+                    "process_name": row.get("process_name")
+                }
+            )
+        return count, top
+
+    def get_long_slices_attributed(
+        self,
+        threshold_ms: int,
+        top_n: int,
+        focus_pid: int | None,
+        assumptions: dict
+    ) -> dict:
+        count, top = self._query_long_slices_attributed(
+            threshold_ms,
+            top_n,
+            focus_pid,
+            None,
+            assumptions,
+            "long_slices_attributed"
+        )
+        top_payload = [
+            {
+                "name": item["name"],
+                "dur_ms": item["dur_ms"],
+                "pid": item["pid"],
+                "tid": item["tid"],
+                "thread_name": item["thread_name"],
+                "process_name": item["process_name"]
+            }
+            for item in top
+        ]
+        return {
+            "threshold_ms": threshold_ms,
+            "count": count,
+            "top": top_payload
+        }
+
+    def get_ui_thread_long_tasks(
+        self,
+        threshold_ms: int,
+        top_n: int,
+        main_thread: dict | None,
+        focus_pid: int | None,
+        assumptions: dict
+    ) -> tuple[int, list[dict], str]:
+        if main_thread:
+            count, top = self._query_long_slices_attributed(
+                threshold_ms,
+                top_n,
+                None,
+                main_thread.get("tid"),
+                assumptions,
+                "long_tasks"
+            )
+            assumption = f"Long tasks filtered to main thread tid={main_thread.get('tid')}"
+        elif focus_pid is not None:
+            count, top = self._query_long_slices_attributed(
+                threshold_ms,
+                top_n,
+                focus_pid,
+                None,
+                assumptions,
+                "long_tasks"
+            )
+            assumption = f"Long tasks filtered to focus pid={focus_pid}"
+        else:
+            count, top = self._query_long_slices_attributed(
+                threshold_ms,
+                top_n,
+                None,
+                None,
+                assumptions,
+                "long_tasks"
+            )
+            assumption = "Long tasks computed across all slices (no focus process or main thread)"
+
+        top_list = [
+            {
+                "name": item["name"],
+                "dur_ms": item["dur_ms"],
+                "ts_ms": item["ts_ms"]
+            }
+            for item in top
+        ]
+        return count, top_list, assumption
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -373,10 +534,18 @@ def analyze_trace(
         # Extract startup time
         startup_ms, startup_assumption = analyzer.get_startup_ms(assumptions)
 
-        # Extract long tasks
-        long_task_count, long_task_top, long_task_assumption = analyzer.get_long_tasks(
+        # Extract long tasks with attribution
+        long_task_count, long_task_top, long_task_assumption = analyzer.get_ui_thread_long_tasks(
             long_task_ms,
             top_n,
+            main_thread,
+            focus_pid,
+            assumptions
+        )
+        long_slices_attributed = analyzer.get_long_slices_attributed(
+            long_task_ms,
+            top_n,
+            focus_pid,
             assumptions
         )
 
@@ -405,7 +574,9 @@ def analyze_trace(
                 "total": frame_total,
                 "janky": frame_janky
             },
-            "features": {},
+            "features": {
+                "long_slices_attributed": long_slices_attributed
+            },
             "summary": {},
             "assumptions": assumptions
         }
