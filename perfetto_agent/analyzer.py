@@ -731,6 +731,15 @@ def analyze_trace(
         cpu_features = analyzer.get_cpu_features(focus_pid, assumptions)
 
         # Initialize result with required schema
+        top_app_sections = [
+            entry["name"]
+            for entry in app_sections.get("top_by_total_ms", [])
+            if entry.get("name")
+        ][:3]
+        top_long_slice_name = None
+        if long_slices_attributed.get("top"):
+            top_long_slice_name = long_slices_attributed["top"][0].get("name")
+
         result = {
             "schema_version": schema_version,
             "focus_process": focus_process,
@@ -758,7 +767,11 @@ def analyze_trace(
                 "frame_features": frame_features,
                 "cpu_features": cpu_features
             },
-            "summary": {},
+            "summary": {
+                "main_thread_found": main_thread is not None,
+                "top_app_sections": top_app_sections,
+                "top_long_slice_name": top_long_slice_name
+            },
             "assumptions": assumptions
         }
         _set_assumption(
