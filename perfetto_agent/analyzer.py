@@ -83,6 +83,55 @@ class PerfettoAnalyzer:
         )
         return [{"pid": row["pid"], "name": row["name"]} for row in rows]
 
+    def resolve_focus_pid(self, focus_process: str | None, assumptions: dict) -> int | None:
+        """
+        Resolve focus_process to a PID, preferring the busiest matching process.
+        """
+        if not focus_process:
+            return None
+
+        escaped = focus_process.replace("'", "''")
+        candidates = _safe_q(
+            self.tp,
+            f"""
+            SELECT pid, name
+            FROM process
+            WHERE name = '{escaped}'
+            """,
+            "focus_process",
+            assumptions
+        )
+
+        if not candidates:
+            return None
+
+        if len(candidates) == 1:
+            return candidates[0].get("pid")
+
+        ranked = _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                p.pid AS pid,
+                COUNT(s.id) AS slice_count,
+                MAX(s.ts) AS max_ts
+            FROM process p
+            JOIN thread t ON t.upid = p.upid
+            JOIN thread_track tt ON tt.utid = t.utid
+            JOIN slice s ON s.track_id = tt.id
+            WHERE p.name = '{escaped}'
+            GROUP BY p.pid
+            ORDER BY slice_count DESC, max_ts DESC
+            LIMIT 1
+            """,
+            "focus_process",
+            assumptions
+        )
+
+        if ranked:
+            return ranked[0].get("pid")
+
+        return candidates[0].get("pid")
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -259,6 +308,8 @@ def analyze_trace(
         trace_duration_ms = analyzer.get_trace_duration_ms(assumptions)
         processes = analyzer.get_processes(assumptions)
 
+        focus_pid = analyzer.resolve_focus_pid(focus_process, assumptions)
+
         # Extract startup time
         startup_ms, startup_assumption = analyzer.get_startup_ms(assumptions)
 
@@ -276,7 +327,7 @@ def analyze_trace(
         result = {
             "schema_version": schema_version,
             "focus_process": focus_process,
-            "focus_pid": None,
+            "focus_pid": focus_pid,
             "trace_path": trace_path,
             "trace_duration_ms": trace_duration_ms,
             "processes": processes,
@@ -305,6 +356,12 @@ def analyze_trace(
         _set_assumption(result["assumptions"], "startup", startup_assumption)
         _set_assumption(result["assumptions"], "long_tasks", long_task_assumption)
         _set_assumption(result["assumptions"], "frames", frame_assumption)
+        if focus_process and focus_pid is None:
+            _set_assumption(
+                result["assumptions"],
+                "focus_process",
+                f"No matching process found for focus_process={focus_process}"
+            )
         return result
     finally:
         analyzer.close()
