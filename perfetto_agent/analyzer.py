@@ -726,8 +726,7 @@ def analyze_trace(
         )
         app_sections = analyzer.get_app_sections(focus_pid, assumptions)
 
-        # Extract frame summary
-        frame_total, frame_janky, frame_assumption = analyzer.get_frame_summary(assumptions)
+        # Extract frame features
         frame_features = analyzer.get_frame_features(assumptions)
         cpu_features = analyzer.get_cpu_features(focus_pid, assumptions)
 
@@ -758,10 +757,6 @@ def analyze_trace(
                 "count": long_task_count,
                 "top": long_task_top
             },
-            "frame_summary": {
-                "total": frame_total,
-                "janky": frame_janky
-            },
             "features": {
                 "long_slices_attributed": long_slices_attributed,
                 "app_sections": app_sections,
@@ -787,7 +782,11 @@ def analyze_trace(
         )
         _set_assumption(result["assumptions"], "startup", startup_assumption)
         _set_assumption(result["assumptions"], "long_tasks", long_task_assumption)
-        _set_assumption(result["assumptions"], "frames", frame_assumption)
+        _set_assumption(
+            result["assumptions"],
+            "frames",
+            "Frame features computed from doFrame slices (p95/jank best-effort)"
+        )
         if focus_process and focus_pid is None:
             _set_assumption(
                 result["assumptions"],

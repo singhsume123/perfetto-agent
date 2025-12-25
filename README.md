@@ -145,10 +145,6 @@ The analyzer produces a JSON file with the following structure:
       {"name": "inflate", "dur_ms": 87.2, "ts_ms": 5678.9}
     ]
   },
-  "frame_summary": {
-    "total": 247,
-    "janky": 8
-  },
   "features": {
     "app_sections": {
       "counts": {"StartupInit": 1, "UI#stall_button_click": 2},
@@ -187,7 +183,7 @@ The analyzer produces a JSON file with the following structure:
     "processes": "Extracted from process table, limited to 20 entries",
     "startup": "Startup estimated as earliest slice to first Choreographer/doFrame",
     "long_tasks": "Long tasks detected as slices with dur >= 50ms...",
-    "frames": "Frames counted from doFrame slices. Janky defined as dur > 16ms..."
+    "frames": "Frame features computed from doFrame slices (p95/jank best-effort)"
   }
 }
 ```
@@ -197,7 +193,7 @@ The analyzer produces a JSON file with the following structure:
 - Trace metadata extraction (duration, processes)
 - Startup time estimation (best-effort heuristic)
 - Long task detection (duration-based)
-- Frame rendering summary (doFrame counting)
+- Frame rendering features (p95 + jank)
 - App marker extraction (Trace.beginSection-style)
 - Slice attribution to process/thread
 - Frame p95 duration and CPU-ish aggregates
