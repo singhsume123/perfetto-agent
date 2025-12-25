@@ -385,6 +385,7 @@ class PerfettoAnalyzer:
             WHERE {where_sql}
             GROUP BY s.name
             ORDER BY total_ms DESC
+            LIMIT 20
             """,
             "app_sections",
             assumptions
