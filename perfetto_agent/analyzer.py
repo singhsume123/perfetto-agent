@@ -37,6 +37,14 @@ def _normalize_slice_name(name: str | None) -> str:
     return name
 
 
+def _percentile(values: list[float], percentile: float) -> float | None:
+    if not values:
+        return None
+    sorted_values = sorted(values)
+    index = int(round((len(sorted_values) - 1) * percentile))
+    return sorted_values[index]
+
+
 class PerfettoAnalyzer:
     """Wrapper for Perfetto TraceProcessor with helper utilities."""
 
@@ -399,6 +407,48 @@ class PerfettoAnalyzer:
             "counts": counts,
             "top_by_total_ms": top_by_total_ms
         }
+
+    def get_frame_features(self, assumptions: dict) -> dict:
+        """
+        Compute frame feature aggregates including p95 duration.
+        """
+        rows = _safe_q(
+            self.tp,
+            """
+            SELECT dur / 1e6 AS dur_ms
+            FROM slice
+            WHERE name LIKE '%doFrame%'
+            """,
+            "frames",
+            assumptions
+        )
+
+        if not rows:
+            _set_assumption(assumptions, "frames", "No doFrame slices found for frame features")
+            return {
+                "total_frames": None,
+                "janky_frames": None,
+                "p95_frame_ms": None
+            }
+
+        durations = [row["dur_ms"] for row in rows if row.get("dur_ms") is not None]
+        if not durations:
+            _set_assumption(assumptions, "frames", "Frame durations unavailable for p95 calculation")
+            return {
+                "total_frames": None,
+                "janky_frames": None,
+                "p95_frame_ms": None
+            }
+
+        total_frames = len(durations)
+        janky_frames = len([value for value in durations if value > 16])
+        p95_frame_ms = _percentile(durations, 0.95)
+
+        return {
+            "total_frames": total_frames,
+            "janky_frames": janky_frames,
+            "p95_frame_ms": p95_frame_ms
+        }
     def get_startup_ms(self, assumptions: dict) -> tuple[float | None, str]:
         """
         Estimate app startup time using a simple heuristic.
@@ -599,6 +649,7 @@ def analyze_trace(
 
         # Extract frame summary
         frame_total, frame_janky, frame_assumption = analyzer.get_frame_summary(assumptions)
+        frame_features = analyzer.get_frame_features(assumptions)
 
         # Initialize result with required schema
         result = {
@@ -624,7 +675,8 @@ def analyze_trace(
             },
             "features": {
                 "long_slices_attributed": long_slices_attributed,
-                "app_sections": app_sections
+                "app_sections": app_sections,
+                "frame_features": frame_features
             },
             "summary": {},
             "assumptions": assumptions
