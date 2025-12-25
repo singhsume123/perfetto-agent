@@ -1,0 +1,129 @@
+{
+  "trace_path": "tracetoy_trace.perfetto-trace",
+  "trace_duration_ms": 36531.395475,
+  "processes": [
+    {
+      "pid": 1,
+      "name": "/system/bin/init"
+    },
+    {
+      "pid": 2,
+      "name": "kthreadd"
+    },
+    {
+      "pid": 3,
+      "name": "rcu_gp"
+    },
+    {
+      "pid": 4,
+      "name": "slub_flushwq"
+    },
+    {
+      "pid": 5,
+      "name": "netns"
+    },
+    {
+      "pid": 6,
+      "name": "kworker/0:0"
+    },
+    {
+      "pid": 8,
+      "name": "kworker/u2:0"
+    },
+    {
+      "pid": 9,
+      "name": "mm_percpu_wq"
+    },
+    {
+      "pid": 11,
+      "name": "rcu_tasks_kthread"
+    },
+    {
+      "pid": 12,
+      "name": "rcu_tasks_trace_kthread"
+    },
+    {
+      "pid": 13,
+      "name": "ksoftirqd/0"
+    },
+    {
+      "pid": 14,
+      "name": "rcu_preempt"
+    },
+    {
+      "pid": 15,
+      "name": "rcub/0"
+    },
+    {
+      "pid": 16,
+      "name": "rcu_exp_gp_kthread_worker"
+    },
+    {
+      "pid": 17,
+      "name": "rcu_exp_par_gp_kthread_worker"
+    },
+    {
+      "pid": 18,
+      "name": "migration/0"
+    },
+    {
+      "pid": 20,
+      "name": "cpuhp/0"
+    },
+    {
+      "pid": 21,
+      "name": "inet_frag_wq"
+    },
+    {
+      "pid": 22,
+      "name": "kauditd"
+    },
+    {
+      "pid": 23,
+      "name": "khungtaskd"
+    }
+  ],
+  "startup_ms": 2910.1542520000366,
+  "ui_thread_long_tasks": {
+    "threshold_ms": 50,
+    "count": 316,
+    "top": [
+      {
+        "name": "144",
+        "dur_ms": 4285.111086,
+        "ts_ms": 429666.567243
+      },
+      {
+        "name": "381",
+        "dur_ms": 1589.958169,
+        "ts_ms": 442983.650666
+      },
+      {
+        "name": "380",
+        "dur_ms": 1584.09721,
+        "ts_ms": 442999.928833
+      },
+      {
+        "name": "548",
+        "dur_ms": 1555.019168,
+        "ts_ms": 450934.427921
+      },
+      {
+        "name": "547",
+        "dur_ms": 1548.621293,
+        "ts_ms": 450951.804754
+      }
+    ]
+  },
+  "frame_summary": {
+    "total": 888,
+    "janky": 37
+  },
+  "assumptions": {
+    "trace_duration": "Calculated from trace_bounds table (end_ts - start_ts)",
+    "processes": "Extracted from process table, limited to 20 entries",
+    "startup": "Startup estimated as earliest slice (425136.28ms) to first Choreographer/doFrame (428046.43ms)",
+    "long_tasks": "Long tasks detected as slices with dur >= 50ms. Note: UI thread attribution not yet implemented (planned for Week A2)",
+    "frames": "Frames counted from doFrame slices. Janky defined as dur > 16ms (60fps threshold). Found 888 total frames, 37 janky"
+  }
+}
