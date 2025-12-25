@@ -50,6 +50,8 @@ cat analysis.json
 - `--out PATH` - Output JSON file path (default: `analysis.json`)
 - `--long-task-ms INT` - Threshold for long tasks in milliseconds (default: `50`)
 - `--top-n INT` - Number of top long tasks to report (default: `5`)
+- `--focus-process TEXT` - Filter analysis to a specific process name (optional)
+- `--schema-version TEXT` - Schema version to emit (default: `A2`)
 
 ### Example
 
@@ -58,7 +60,8 @@ python3 -m perfetto_agent.cli analyze \
   --trace ~/traces/app_trace.pb \
   --out results.json \
   --long-task-ms 100 \
-  --top-n 10
+  --top-n 10 \
+  --focus-process com.example.tracetoy
 ```
 
 ## Recording a Trace
@@ -118,6 +121,9 @@ The analyzer produces a JSON file with the following structure:
 
 ```json
 {
+  "schema_version": "A2",
+  "focus_process": "com.example.tracetoy",
+  "focus_pid": 1234,
   "trace_path": "/path/to/trace.pb",
   "trace_duration_ms": 15234.5,
   "processes": [
@@ -125,6 +131,12 @@ The analyzer produces a JSON file with the following structure:
     {"pid": 5678, "name": "system_server"}
   ],
   "startup_ms": 856.3,
+  "threads": {
+    "main_thread": {"tid": 1234, "name": "main", "pid": 1234, "process_name": "com.example.tracetoy"},
+    "top_threads_by_slice_ms": [
+      {"tid": 1234, "thread_name": "main", "pid": 1234, "total_slice_ms": 987.6}
+    ]
+  },
   "ui_thread_long_tasks": {
     "threshold_ms": 50,
     "count": 12,
@@ -136,6 +148,39 @@ The analyzer produces a JSON file with the following structure:
   "frame_summary": {
     "total": 247,
     "janky": 8
+  },
+  "features": {
+    "app_sections": {
+      "counts": {"StartupInit": 1, "UI#stall_button_click": 2},
+      "top_by_total_ms": [
+        {"name": "UI#stall_button_click", "total_ms": 402.1, "count": 2}
+      ]
+    },
+    "long_slices_attributed": {
+      "threshold_ms": 50,
+      "count": 12,
+      "top": [
+        {"name": "UI#stall_button_click", "dur_ms": 201.4, "pid": 1234, "tid": 1234, "thread_name": "main", "process_name": "com.example.tracetoy"}
+      ]
+    },
+    "cpu_features": {
+      "top_processes_by_slice_ms": [
+        {"pid": 1234, "process_name": "com.example.tracetoy", "total_slice_ms": 4567.8}
+      ],
+      "top_threads_by_slice_ms": [
+        {"tid": 1234, "thread_name": "main", "pid": 1234, "total_slice_ms": 987.6}
+      ]
+    },
+    "frame_features": {
+      "total_frames": 247,
+      "janky_frames": 8,
+      "p95_frame_ms": 22.3
+    }
+  },
+  "summary": {
+    "main_thread_found": true,
+    "top_app_sections": ["UI#stall_button_click", "StartupInit"],
+    "top_long_slice_name": "UI#stall_button_click"
   },
   "assumptions": {
     "trace_duration": "Calculated from trace_bounds table (end_ts - start_ts)",
@@ -153,11 +198,14 @@ The analyzer produces a JSON file with the following structure:
 - Startup time estimation (best-effort heuristic)
 - Long task detection (duration-based)
 - Frame rendering summary (doFrame counting)
+- App marker extraction (Trace.beginSection-style)
+- Slice attribution to process/thread
+- Frame p95 duration and CPU-ish aggregates
 - Comprehensive assumptions documentation
 
 ### Current Limitations
 
-- UI thread attribution is coarse (not precise main thread detection)
+- UI thread attribution is best-effort, depends on available tables
 - Startup detection is basic (earliest slice to first frame)
 - No AI/LLM analysis
 - No dashboard/visualization
