@@ -1,12 +1,10 @@
-# Perfetto Baseline Analyzer - Week A1
+# Perfetto Baseline Analyzer
 
 A Python CLI tool for analyzing Perfetto traces and extracting Android performance metrics.
 
-## Project Structure
+## Generating Test Traces
 
-This is part of the Week A1 project which includes:
-- `perfetto-agent/` - Python CLI analyzer (this directory)
-- `TraceToy/` - Android Compose sample app for generating test traces
+Use the [TraceToy](https://github.com/singhsume123/TraceToy) Android app to generate Perfetto traces for testing. TraceToy is a Jetpack Compose sample app that includes UI stall buttons, scrollable lists, and custom trace markers.
 
 ## Setup
 
@@ -68,7 +66,7 @@ python3 -m perfetto_agent.cli analyze \
 ### Using Android Studio Profiler
 
 1. Open Android Studio
-2. Open the TraceToy project from `../TraceToy/`
+2. Clone and open the [TraceToy](https://github.com/singhsume123/TraceToy) app
 3. Build and run the app on a device/emulator
 4. Open Profiler (View > Tool Windows > Profiler)
 5. Click the "+" button and select your device/app
@@ -151,15 +149,13 @@ The analyzer produces a JSON file with the following structure:
 
 ## Features
 
-### Implemented (Week A1)
-
 - Trace metadata extraction (duration, processes)
 - Startup time estimation (best-effort heuristic)
 - Long task detection (duration-based)
 - Frame rendering summary (doFrame counting)
 - Comprehensive assumptions documentation
 
-### Limitations (to be addressed in future weeks)
+### Current Limitations
 
 - UI thread attribution is coarse (not precise main thread detection)
 - Startup detection is basic (earliest slice to first frame)
@@ -169,7 +165,7 @@ The analyzer produces a JSON file with the following structure:
 
 ## Testing with TraceToy
 
-1. Build and install the TraceToy app (see `../TraceToy/README.md`)
+1. Build and install the [TraceToy](https://github.com/singhsume123/TraceToy) app
 2. Record a trace while using the app
 3. Run the analyzer on the recorded trace
 4. Verify the output includes:
@@ -197,11 +193,3 @@ The trace might not contain expected data. Try:
 - Recording a longer trace
 - Using the TraceToy app to generate known trace events
 - Checking the `assumptions` field in the output for hints
-
-## Development
-
-This is the Week A1 baseline implementation. Future weeks will add:
-- More accurate thread attribution (Week A2)
-- Additional performance metrics
-- Multi-trace analysis
-- Visualization capabilities
