@@ -99,6 +99,13 @@ def _dominant_category_value(category_totals: dict[str, float]) -> tuple[str | N
     return category, category_totals.get(category), None
 
 
+def _prefer_non_unknown_suspects(suspects: list[dict]) -> tuple[list[dict], bool]:
+    non_unknown = [suspect for suspect in suspects if suspect.get("category") != "unknown"]
+    if non_unknown:
+        return non_unknown, True
+    return suspects, False
+
+
 def _overlap_ms(start_ms: float, end_ms: float, window_start_ms: float, window_end_ms: float) -> float:
     latest_start = max(start_ms, window_start_ms)
     earliest_end = min(end_ms, window_end_ms)
@@ -1082,6 +1089,7 @@ def analyze_trace(
                             {
                                 "label": label,
                                 "window": window_name,
+                                "category": category,
                                 "evidence": {f"{category}_ms": value}
                             }
                         )
@@ -1098,10 +1106,20 @@ def analyze_trace(
                         {
                             "label": label,
                             "window": window_name,
+                            "category": category,
                             "evidence": {f"{category}_ms": value}
                         }
                     )
                     seen_labels.add(label)
+        suspects, filtered = _prefer_non_unknown_suspects(suspects)
+        if not suspects:
+            _set_assumption(assumptions, "suspects", "No suspects generated")
+        elif not filtered:
+            _set_assumption(
+                assumptions,
+                "suspects",
+                "Only unknown-category suspects available"
+            )
         work_breakdown = analyzer.get_work_breakdown(long_task_ms, focus_pid, main_thread, assumptions)
 
         # Initialize result with required schema

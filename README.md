@@ -199,6 +199,7 @@ The analyzer produces a JSON file with the following structure:
 - Frame p95 duration and CPU-ish aggregates
 - A3 core: work classification into app/framework/system/unknown with breakdowns
 - A4 core: time windows, windowed breakdowns, deterministic suspects
+- A5 core: optional LLM explanations over analysis.json
 - Comprehensive assumptions documentation
 
 ### Current Limitations
@@ -206,7 +207,7 @@ The analyzer produces a JSON file with the following structure:
 - UI thread attribution is best-effort, depends on available tables
 - Startup detection is basic (earliest slice to first frame)
 - Classification is token-based and conservative; unknown used when uncertain
-- No AI/LLM analysis
+- Optional LLM explanations (JSON-only) require OPENAI_API_KEY
 - No dashboard/visualization
 - Single trace analysis only
 
@@ -234,6 +235,35 @@ categories, and extends summary with:
 - `summary.startup_dominant_category`
 - `summary.steady_state_dominant_category`
 - `summary.top_suspect`
+
+## A5 Core: Optional LLM Explanation
+
+The explainer uses only derived JSON (never raw traces) and produces:
+- `explanation.json` (structured, with evidence paths)
+- `explanation.md` (human-readable with evidence appendix)
+
+Run standalone explain:
+```bash
+python3 -m perfetto_agent.cli explain \
+  --analysis analysis.json \
+  --baseline baseline.json \
+  --out explanation.md
+```
+
+Or during analysis:
+```bash
+python3 -m perfetto_agent.cli analyze \
+  --trace tracetoy_trace.perfetto-trace \
+  --focus-process com.example.tracetoy \
+  --out analysis.json \
+  --explain \
+  --explain-out explanation.md
+```
+
+Grounding rules:
+- Every claim must include `evidence` JSON paths.
+- If evidence is missing, output must say “insufficient evidence.”
+- No fixes or optimizations; only next inspection steps.
 
 ## Testing with TraceToy
 
