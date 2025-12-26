@@ -92,6 +92,19 @@ def _dominant_category(category_totals: dict[str, float]) -> tuple[str | None, s
     return winners[0], None
 
 
+def _dominant_category_value(category_totals: dict[str, float]) -> tuple[str | None, float | None, str | None]:
+    category, reason = _dominant_category(category_totals)
+    if category is None:
+        return None, None, reason
+    return category, category_totals.get(category), None
+
+
+def _overlap_ms(start_ms: float, end_ms: float, window_start_ms: float, window_end_ms: float) -> float:
+    latest_start = max(start_ms, window_start_ms)
+    earliest_end = min(end_ms, window_end_ms)
+    return max(0.0, earliest_end - latest_start)
+
+
 class PerfettoAnalyzer:
     """Wrapper for Perfetto TraceProcessor with helper utilities."""
 
@@ -146,6 +159,17 @@ class PerfettoAnalyzer:
             assumptions
         )
         return [{"pid": row["pid"], "name": row["name"]} for row in rows]
+
+    def get_earliest_slice_ms(self, assumptions: dict) -> float | None:
+        rows = _safe_q(
+            self.tp,
+            "SELECT MIN(ts) / 1e6 AS earliest_ms FROM slice",
+            "earliest_slice",
+            assumptions
+        )
+        if rows:
+            return rows[0].get("earliest_ms")
+        return None
 
     def resolve_focus_pid(self, focus_process: str | None, assumptions: dict) -> int | None:
         """
@@ -361,6 +385,40 @@ class PerfettoAnalyzer:
             assumptions
         )
 
+    def _query_attributed_slices_with_ts(
+        self,
+        pid_filter: int | None,
+        tid_filter: int | None,
+        assumptions: dict,
+        assumption_key: str
+    ) -> list[dict]:
+        where_clauses = ["s.dur > 0"]
+        if pid_filter is not None:
+            where_clauses.append(f"p.pid = {pid_filter}")
+        if tid_filter is not None:
+            where_clauses.append(f"t.tid = {tid_filter}")
+        where_sql = " AND ".join(where_clauses)
+
+        return _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                s.name AS name,
+                s.ts / 1e6 AS ts_ms,
+                s.dur / 1e6 AS dur_ms,
+                p.pid AS pid,
+                t.tid AS tid
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            WHERE {where_sql}
+            """,
+            assumption_key,
+            assumptions
+        )
+
     def get_long_slices_attributed(
         self,
         threshold_ms: int,
@@ -466,6 +524,92 @@ class PerfettoAnalyzer:
             "by_category_ms": by_category_ms,
             "main_thread_blocking": main_thread_blocking
         }
+
+    def get_window_breakdown(
+        self,
+        time_windows: dict,
+        focus_pid: int | None,
+        main_thread: dict | None,
+        earliest_ms: float | None,
+        assumptions: dict
+    ) -> dict:
+        if earliest_ms is None:
+            _set_assumption(
+                assumptions,
+                "window_breakdown",
+                "Cannot compute window breakdown without earliest slice timestamp"
+            )
+            return {
+                "startup": {"by_category_ms": {}, "main_thread_blocking_ms": {}},
+                "steady_state": {"by_category_ms": {}, "main_thread_blocking_ms": {}}
+            }
+
+        rows = self._query_attributed_slices_with_ts(
+            None,
+            None,
+            assumptions,
+            "window_breakdown"
+        )
+        if not rows:
+            _set_assumption(
+                assumptions,
+                "window_breakdown",
+                "No attributed slices available for window breakdown"
+            )
+            return {
+                "startup": {"by_category_ms": {}, "main_thread_blocking_ms": {}},
+                "steady_state": {"by_category_ms": {}, "main_thread_blocking_ms": {}}
+            }
+
+        def init_category_totals() -> dict:
+            return {"app": 0.0, "framework": 0.0, "system": 0.0, "unknown": 0.0}
+
+        def init_blocking_totals() -> dict:
+            return {"app_ms": 0.0, "framework_ms": 0.0, "system_ms": 0.0, "unknown_ms": 0.0}
+
+        startup_window = time_windows.get("startup", {})
+        steady_window = time_windows.get("steady_state", {})
+        windows = {
+            "startup": startup_window,
+            "steady_state": steady_window
+        }
+        breakdown = {
+            "startup": {"by_category_ms": init_category_totals(), "main_thread_blocking_ms": init_blocking_totals()},
+            "steady_state": {"by_category_ms": init_category_totals(), "main_thread_blocking_ms": init_blocking_totals()}
+        }
+
+        for row in rows:
+            ts_ms = row.get("ts_ms")
+            dur_ms = row.get("dur_ms")
+            if ts_ms is None or dur_ms is None:
+                continue
+            start_ms = float(ts_ms) - earliest_ms
+            end_ms = start_ms + float(dur_ms)
+            category = classify_slice_name(row.get("name"), row.get("pid"), focus_pid)
+
+            for window_name, window in windows.items():
+                window_start = window.get("start_ms")
+                window_end = window.get("end_ms")
+                if window_start is None or window_end is None:
+                    continue
+                overlap = _overlap_ms(start_ms, end_ms, float(window_start), float(window_end))
+                if overlap <= 0:
+                    continue
+                breakdown[window_name]["by_category_ms"][category] += overlap
+                if main_thread and row.get("tid") == main_thread.get("tid"):
+                    key = f"{category}_ms"
+                    breakdown[window_name]["main_thread_blocking_ms"][key] += overlap
+
+        if not main_thread:
+            _set_assumption(
+                assumptions,
+                "main_thread_blocking_ms",
+                "Main thread unavailable for window blocking breakdown"
+            )
+            breakdown["startup"]["main_thread_blocking_ms"] = {}
+            breakdown["steady_state"]["main_thread_blocking_ms"] = {}
+
+        return breakdown
 
     def get_ui_thread_long_tasks(
         self,
@@ -864,6 +1008,7 @@ def analyze_trace(
 
         # Extract startup time
         startup_ms, startup_assumption = analyzer.get_startup_ms(assumptions)
+        earliest_ms = analyzer.get_earliest_slice_ms(assumptions)
 
         # Extract long tasks with attribution
         long_task_count, long_task_top, long_task_assumption = analyzer.get_ui_thread_long_tasks(
@@ -884,6 +1029,79 @@ def analyze_trace(
         # Extract frame features
         frame_features = analyzer.get_frame_features(assumptions)
         cpu_features = analyzer.get_cpu_features(focus_pid, assumptions)
+        startup_fallback_ms = 1800.0
+        steady_state_window_ms = 5000.0
+        if startup_ms is None:
+            _set_assumption(
+                assumptions,
+                "time_windows",
+                "Startup window uses fallback because startup_ms is missing"
+            )
+            startup_end_ms = startup_fallback_ms
+            startup_method = "fallback_1800ms"
+        else:
+            startup_end_ms = startup_ms
+            startup_method = "startup_ms"
+
+        time_windows = {
+            "startup": {
+                "start_ms": 0.0,
+                "end_ms": startup_end_ms,
+                "method": startup_method
+            },
+            "steady_state": {
+                "start_ms": startup_end_ms,
+                "end_ms": startup_end_ms + steady_state_window_ms,
+                "method": "startup_end + 5000ms"
+            }
+        }
+        window_breakdown = analyzer.get_window_breakdown(
+            time_windows,
+            focus_pid,
+            main_thread,
+            earliest_ms,
+            assumptions
+        )
+
+        suspects = []
+        seen_labels: set[str] = set()
+        for window_name in ["startup", "steady_state"]:
+            window_breakdown_entry = window_breakdown.get(window_name, {})
+            blocking = window_breakdown_entry.get("main_thread_blocking_ms", {})
+            if blocking:
+                blocking_normalized = {
+                    key.replace("_ms", ""): value for key, value in blocking.items()
+                }
+                category, value, reason = _dominant_category_value(blocking_normalized)
+                if reason:
+                    _set_assumption(assumptions, f"{window_name}_main_thread_blocking", reason)
+                if category and value is not None and category != "app":
+                    label = f"{window_name.capitalize()} main thread dominated by {category} work"
+                    if label not in seen_labels:
+                        suspects.append(
+                            {
+                                "label": label,
+                                "window": window_name,
+                                "evidence": {f"{category}_ms": value}
+                            }
+                        )
+                        seen_labels.add(label)
+
+            by_category = window_breakdown_entry.get("by_category_ms", {})
+            category, value, reason = _dominant_category_value(by_category)
+            if reason:
+                _set_assumption(assumptions, f"{window_name}_dominant_category", reason)
+            if category and value is not None and category != "app":
+                label = f"{window_name.capitalize()} dominated by {category} work"
+                if label not in seen_labels:
+                    suspects.append(
+                        {
+                            "label": label,
+                            "window": window_name,
+                            "evidence": {f"{category}_ms": value}
+                        }
+                    )
+                    seen_labels.add(label)
         work_breakdown = analyzer.get_work_breakdown(long_task_ms, focus_pid, main_thread, assumptions)
 
         # Initialize result with required schema
@@ -918,6 +1136,21 @@ def analyze_trace(
                 "No main thread blocking breakdown available"
             )
 
+        startup_dominant_category, startup_reason = _dominant_category(
+            window_breakdown.get("startup", {}).get("by_category_ms", {})
+        )
+        if startup_reason:
+            _set_assumption(assumptions, "startup_dominant_category", startup_reason)
+        steady_dominant_category, steady_reason = _dominant_category(
+            window_breakdown.get("steady_state", {}).get("by_category_ms", {})
+        )
+        if steady_reason:
+            _set_assumption(assumptions, "steady_state_dominant_category", steady_reason)
+
+        top_suspect = suspects[0]["label"] if suspects else None
+        if top_suspect is None:
+            _set_assumption(assumptions, "top_suspect", "No suspects generated")
+
         result = {
             "schema_version": schema_version,
             "focus_process": focus_process,
@@ -940,14 +1173,20 @@ def analyze_trace(
                 "app_sections": app_sections,
                 "frame_features": frame_features,
                 "cpu_features": cpu_features,
-                "work_breakdown": work_breakdown
+                "work_breakdown": work_breakdown,
+                "time_windows": time_windows,
+                "window_breakdown": window_breakdown,
+                "suspects": suspects
             },
             "summary": {
                 "main_thread_found": main_thread is not None,
                 "top_app_sections": top_app_sections,
                 "top_long_slice_name": top_long_slice_name,
                 "dominant_work_category": dominant_work_category,
-                "main_thread_blocked_by": main_thread_blocked_by
+                "main_thread_blocked_by": main_thread_blocked_by,
+                "startup_dominant_category": startup_dominant_category,
+                "steady_state_dominant_category": steady_dominant_category,
+                "top_suspect": top_suspect
             },
             "assumptions": assumptions
         }

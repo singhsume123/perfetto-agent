@@ -198,6 +198,7 @@ The analyzer produces a JSON file with the following structure:
 - Slice attribution to process/thread
 - Frame p95 duration and CPU-ish aggregates
 - A3 core: work classification into app/framework/system/unknown with breakdowns
+- A4 core: time windows, windowed breakdowns, deterministic suspects
 - Comprehensive assumptions documentation
 
 ### Current Limitations
@@ -220,6 +221,19 @@ The analyzer classifies slice work into four categories:
 These categories appear on `features.long_slices_attributed.top[*].category`,
 with aggregate totals in `features.work_breakdown` and summary fields in
 `summary.dominant_work_category` and `summary.main_thread_blocked_by`.
+
+## A4 Core: Time Windows & Suspects
+
+The analyzer defines a startup window and steady-state window, then computes
+category totals and main-thread blocking per window:
+- `features.time_windows`
+- `features.window_breakdown`
+
+It also adds a deterministic `features.suspects` list based on dominant
+categories, and extends summary with:
+- `summary.startup_dominant_category`
+- `summary.steady_state_dominant_category`
+- `summary.top_suspect`
 
 ## Testing with TraceToy
 

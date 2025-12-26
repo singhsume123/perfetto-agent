@@ -455,7 +455,79 @@
         "system_ms": 0.0,
         "unknown_ms": 2840.8786690000006
       }
-    }
+    },
+    "time_windows": {
+      "startup": {
+        "start_ms": 0.0,
+        "end_ms": 2910.1542520000366,
+        "method": "startup_ms"
+      },
+      "steady_state": {
+        "start_ms": 2910.1542520000366,
+        "end_ms": 7910.154252000037,
+        "method": "startup_end + 5000ms"
+      }
+    },
+    "window_breakdown": {
+      "startup": {
+        "by_category_ms": {
+          "app": 0.0,
+          "framework": 0.0,
+          "system": 378.4320799999996,
+          "unknown": 101.33975100008865
+        },
+        "main_thread_blocking_ms": {
+          "app_ms": 0.0,
+          "framework_ms": 0.0,
+          "system_ms": 0.0,
+          "unknown_ms": 101.33975100008865
+        }
+      },
+      "steady_state": {
+        "by_category_ms": {
+          "app": 400.34125099999983,
+          "framework": 1614.9640039999945,
+          "system": 3108.0322490000003,
+          "unknown": 6898.701432000009
+        },
+        "main_thread_blocking_ms": {
+          "app_ms": 400.34125099999983,
+          "framework_ms": 430.5902089999995,
+          "system_ms": 0.20995799999991505,
+          "unknown_ms": 2010.3409539999107
+        }
+      }
+    },
+    "suspects": [
+      {
+        "label": "Startup main thread dominated by unknown work",
+        "window": "startup",
+        "evidence": {
+          "unknown_ms": 101.33975100008865
+        }
+      },
+      {
+        "label": "Startup dominated by system work",
+        "window": "startup",
+        "evidence": {
+          "system_ms": 378.4320799999996
+        }
+      },
+      {
+        "label": "Steady_state main thread dominated by unknown work",
+        "window": "steady_state",
+        "evidence": {
+          "unknown_ms": 2010.3409539999107
+        }
+      },
+      {
+        "label": "Steady_state dominated by unknown work",
+        "window": "steady_state",
+        "evidence": {
+          "unknown_ms": 6898.701432000009
+        }
+      }
+    ]
   },
   "summary": {
     "main_thread_found": true,
@@ -466,7 +538,10 @@
     ],
     "top_long_slice_name": "BG#churn",
     "dominant_work_category": "app",
-    "main_thread_blocked_by": "app"
+    "main_thread_blocked_by": "app",
+    "startup_dominant_category": "system",
+    "steady_state_dominant_category": "unknown",
+    "top_suspect": "Startup main thread dominated by unknown work"
   },
   "assumptions": {
     "trace_duration": "Calculated from trace_bounds table (end_ts - start_ts)",
