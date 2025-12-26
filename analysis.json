@@ -199,7 +199,8 @@
           "pid": 5664,
           "tid": 5664,
           "thread_name": "xample.tracetoy",
-          "process_name": "com.example.tracetoy"
+          "process_name": "com.example.tracetoy",
+          "category": "app"
         },
         {
           "name": "BG#churn",
@@ -207,7 +208,8 @@
           "pid": 5664,
           "tid": 5664,
           "thread_name": "xample.tracetoy",
-          "process_name": "com.example.tracetoy"
+          "process_name": "com.example.tracetoy",
+          "category": "app"
         },
         {
           "name": "Background concurrent copying GC",
@@ -215,7 +217,8 @@
           "pid": 5664,
           "tid": 5677,
           "thread_name": "HeapTaskDaemon",
-          "process_name": "com.example.tracetoy"
+          "process_name": "com.example.tracetoy",
+          "category": "unknown"
         },
         {
           "name": "deliverInputEvent src=0x5002 eventTimeNano=428211057000 id=0x33068d78",
@@ -223,7 +226,8 @@
           "pid": 5664,
           "tid": 5664,
           "thread_name": "xample.tracetoy",
-          "process_name": "com.example.tracetoy"
+          "process_name": "com.example.tracetoy",
+          "category": "unknown"
         },
         {
           "name": "MarkingPhase",
@@ -231,7 +235,8 @@
           "pid": 5664,
           "tid": 5677,
           "thread_name": "HeapTaskDaemon",
-          "process_name": "com.example.tracetoy"
+          "process_name": "com.example.tracetoy",
+          "category": "unknown"
         }
       ]
     },
@@ -436,6 +441,20 @@
           "total_slice_ms": 31.029957
         }
       ]
+    },
+    "work_breakdown": {
+      "by_category_ms": {
+        "app": 12603.717602000008,
+        "framework": 305.765583,
+        "system": 0.0,
+        "unknown": 5167.500212
+      },
+      "main_thread_blocking": {
+        "app_ms": 12603.717602000008,
+        "framework_ms": 305.765583,
+        "system_ms": 0.0,
+        "unknown_ms": 2840.8786690000006
+      }
     }
   },
   "summary": {
@@ -445,13 +464,16 @@
       "dequeueBuffer - VRI[MainActivity]#0(BLAST Consumer)0",
       "UI#stall_button_click"
     ],
-    "top_long_slice_name": "BG#churn"
+    "top_long_slice_name": "BG#churn",
+    "dominant_work_category": "app",
+    "main_thread_blocked_by": "app"
   },
   "assumptions": {
     "trace_duration": "Calculated from trace_bounds table (end_ts - start_ts)",
     "processes": "Extracted from process table, limited to 20 entries",
     "startup": "Startup estimated as earliest slice (425136.28ms) to first Choreographer/doFrame (428046.43ms)",
     "long_tasks": "Long tasks filtered to main thread tid=5664",
-    "frames": "Frame features computed from doFrame slices (p95/jank best-effort)"
+    "frames": "Frame features computed from doFrame slices (p95/jank best-effort)",
+    "classification": "Classification is pid+name token based and best-effort; unknown used when uncertain."
   }
 }

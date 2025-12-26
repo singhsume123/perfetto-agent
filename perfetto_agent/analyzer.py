@@ -45,6 +45,53 @@ def _percentile(values: list[float], percentile: float) -> float | None:
     return sorted_values[index]
 
 
+def classify_slice_name(name: str | None, pid: int | None, focus_pid: int | None) -> str:
+    """
+    Classify a slice into app/framework/system/unknown using pid + name tokens.
+    """
+    if focus_pid is not None and pid is not None and pid != focus_pid:
+        return "system"
+
+    if not name:
+        return "unknown"
+
+    lower_name = name.lower()
+    app_tokens = ["ui#", "bg#", "startupinit"]
+    framework_tokens = [
+        "choreographer",
+        "doframe",
+        "renderthread",
+        "viewrootimpl",
+        "dequeuebuffer",
+        "blast",
+        "hwui"
+    ]
+    system_tokens = ["binder", "surfaceflinger", "sched", "kworker", "irq", "futex"]
+
+    if focus_pid is not None and pid == focus_pid:
+        if any(token in lower_name for token in app_tokens):
+            return "app"
+        if any(token in lower_name for token in framework_tokens):
+            return "framework"
+
+    if any(token in lower_name for token in system_tokens):
+        return "system"
+
+    return "unknown"
+
+
+def _dominant_category(category_totals: dict[str, float]) -> tuple[str | None, str | None]:
+    if not category_totals:
+        return None, "No category totals available"
+    max_value = max(category_totals.values())
+    if max_value <= 0:
+        return None, "Category totals are all zero"
+    winners = [key for key, value in category_totals.items() if value == max_value]
+    if len(winners) != 1:
+        return None, "Category totals have a tie"
+    return winners[0], None
+
+
 class PerfettoAnalyzer:
     """Wrapper for Perfetto TraceProcessor with helper utilities."""
 
@@ -280,6 +327,40 @@ class PerfettoAnalyzer:
             )
         return count, top
 
+    def _query_attributed_slices(
+        self,
+        threshold_ms: int,
+        pid_filter: int | None,
+        tid_filter: int | None,
+        assumptions: dict,
+        assumption_key: str
+    ) -> list[dict]:
+        where_clauses = [f"s.dur / 1e6 >= {threshold_ms}"]
+        if pid_filter is not None:
+            where_clauses.append(f"p.pid = {pid_filter}")
+        if tid_filter is not None:
+            where_clauses.append(f"t.tid = {tid_filter}")
+        where_sql = " AND ".join(where_clauses)
+
+        return _safe_q(
+            self.tp,
+            f"""
+            SELECT
+                s.name AS name,
+                s.dur / 1e6 AS dur_ms,
+                p.pid AS pid,
+                t.tid AS tid
+            FROM slice s
+            JOIN track tr ON s.track_id = tr.id
+            JOIN thread_track tt ON tt.id = tr.id
+            JOIN thread t ON t.utid = tt.utid
+            JOIN process p ON p.upid = t.upid
+            WHERE {where_sql}
+            """,
+            assumption_key,
+            assumptions
+        )
+
     def get_long_slices_attributed(
         self,
         threshold_ms: int,
@@ -302,7 +383,8 @@ class PerfettoAnalyzer:
                 "pid": item["pid"],
                 "tid": item["tid"],
                 "thread_name": item["thread_name"],
-                "process_name": item["process_name"]
+                "process_name": item["process_name"],
+                "category": classify_slice_name(item["name"], item["pid"], focus_pid)
             }
             for item in top
         ]
@@ -310,6 +392,79 @@ class PerfettoAnalyzer:
             "threshold_ms": threshold_ms,
             "count": count,
             "top": top_payload
+        }
+
+    def get_work_breakdown(
+        self,
+        threshold_ms: int,
+        focus_pid: int | None,
+        main_thread: dict | None,
+        assumptions: dict
+    ) -> dict:
+        rows = self._query_attributed_slices(
+            threshold_ms,
+            focus_pid,
+            None,
+            assumptions,
+            "work_breakdown"
+        )
+
+        if not rows:
+            _set_assumption(
+                assumptions,
+                "work_breakdown",
+                "No attributed slices available for work breakdown"
+            )
+            by_category_ms: dict[str, float] = {}
+        else:
+            by_category_ms = {
+                "app": 0.0,
+                "framework": 0.0,
+                "system": 0.0,
+                "unknown": 0.0
+            }
+            for row in rows:
+                dur_ms = row.get("dur_ms")
+                if dur_ms is None:
+                    continue
+                category = classify_slice_name(row.get("name"), row.get("pid"), focus_pid)
+                by_category_ms[category] += float(dur_ms)
+
+        if not main_thread or not main_thread.get("tid"):
+            _set_assumption(
+                assumptions,
+                "main_thread_blocking",
+                "Main thread unavailable for blocking breakdown"
+            )
+            main_thread_blocking: dict[str, float] = {}
+        else:
+            main_rows = self._query_attributed_slices(
+                threshold_ms,
+                None,
+                main_thread.get("tid"),
+                assumptions,
+                "main_thread_blocking"
+            )
+            if not main_rows:
+                main_thread_blocking = {}
+            else:
+                main_thread_blocking = {
+                    "app_ms": 0.0,
+                    "framework_ms": 0.0,
+                    "system_ms": 0.0,
+                    "unknown_ms": 0.0
+                }
+                for row in main_rows:
+                    dur_ms = row.get("dur_ms")
+                    if dur_ms is None:
+                        continue
+                    category = classify_slice_name(row.get("name"), row.get("pid"), focus_pid)
+                    key = f"{category}_ms"
+                    main_thread_blocking[key] += float(dur_ms)
+
+        return {
+            "by_category_ms": by_category_ms,
+            "main_thread_blocking": main_thread_blocking
         }
 
     def get_ui_thread_long_tasks(
@@ -729,6 +884,7 @@ def analyze_trace(
         # Extract frame features
         frame_features = analyzer.get_frame_features(assumptions)
         cpu_features = analyzer.get_cpu_features(focus_pid, assumptions)
+        work_breakdown = analyzer.get_work_breakdown(long_task_ms, focus_pid, main_thread, assumptions)
 
         # Initialize result with required schema
         top_app_sections = [
@@ -739,6 +895,28 @@ def analyze_trace(
         top_long_slice_name = None
         if long_slices_attributed.get("top"):
             top_long_slice_name = long_slices_attributed["top"][0].get("name")
+
+        dominant_work_category, dominant_reason = _dominant_category(
+            work_breakdown.get("by_category_ms", {})
+        )
+        if dominant_reason:
+            _set_assumption(assumptions, "dominant_work_category", dominant_reason)
+
+        main_thread_blocked_by = None
+        blocking = work_breakdown.get("main_thread_blocking", {})
+        if blocking:
+            blocking_normalized = {
+                key.replace("_ms", ""): value for key, value in blocking.items()
+            }
+            main_thread_blocked_by, blocked_reason = _dominant_category(blocking_normalized)
+            if blocked_reason:
+                _set_assumption(assumptions, "main_thread_blocked_by", blocked_reason)
+        else:
+            _set_assumption(
+                assumptions,
+                "main_thread_blocked_by",
+                "No main thread blocking breakdown available"
+            )
 
         result = {
             "schema_version": schema_version,
@@ -761,12 +939,15 @@ def analyze_trace(
                 "long_slices_attributed": long_slices_attributed,
                 "app_sections": app_sections,
                 "frame_features": frame_features,
-                "cpu_features": cpu_features
+                "cpu_features": cpu_features,
+                "work_breakdown": work_breakdown
             },
             "summary": {
                 "main_thread_found": main_thread is not None,
                 "top_app_sections": top_app_sections,
-                "top_long_slice_name": top_long_slice_name
+                "top_long_slice_name": top_long_slice_name,
+                "dominant_work_category": dominant_work_category,
+                "main_thread_blocked_by": main_thread_blocked_by
             },
             "assumptions": assumptions
         }
@@ -786,6 +967,11 @@ def analyze_trace(
             result["assumptions"],
             "frames",
             "Frame features computed from doFrame slices (p95/jank best-effort)"
+        )
+        _set_assumption(
+            result["assumptions"],
+            "classification",
+            "Classification is pid+name token based and best-effort; unknown used when uncertain."
         )
         if focus_process and focus_pid is None:
             _set_assumption(

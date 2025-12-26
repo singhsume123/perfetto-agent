@@ -197,15 +197,29 @@ The analyzer produces a JSON file with the following structure:
 - App marker extraction (Trace.beginSection-style)
 - Slice attribution to process/thread
 - Frame p95 duration and CPU-ish aggregates
+- A3 core: work classification into app/framework/system/unknown with breakdowns
 - Comprehensive assumptions documentation
 
 ### Current Limitations
 
 - UI thread attribution is best-effort, depends on available tables
 - Startup detection is basic (earliest slice to first frame)
+- Classification is token-based and conservative; unknown used when uncertain
 - No AI/LLM analysis
 - No dashboard/visualization
 - Single trace analysis only
+
+## A3 Core: Work Classification
+
+The analyzer classifies slice work into four categories:
+- `app` (app markers on the focused process)
+- `framework` (framework tokens on the focused process)
+- `system` (non-focused pids or system tokens)
+- `unknown` (fallback)
+
+These categories appear on `features.long_slices_attributed.top[*].category`,
+with aggregate totals in `features.work_breakdown` and summary fields in
+`summary.dominant_work_category` and `summary.main_thread_blocked_by`.
 
 ## Testing with TraceToy
 
